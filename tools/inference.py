@@ -6,15 +6,17 @@ import cv2
 import torch
 import numpy as np
 
+from pathlib import Path
+from tqdm import tqdm
+
 sys.path.insert(0, '../lib')
 from utils import misc_utils, visual_utils, nms_utils
 
 def inference(args, config, network):
     # model_path
-    misc_utils.ensure_dir('outputs')
-    saveDir = os.path.join('../model', args.model_dir, config.model_dir)
-    model_file = os.path.join(saveDir,
-            'dump-{}.pth'.format(args.resume_weights))
+    misc_utils.ensure_dir(args.output_folder)
+    model_file = args.weights
+
     assert os.path.exists(model_file)
     # build network
     net = network()
@@ -34,9 +36,9 @@ def inference(args, config, network):
             pred_boxes[:, :4],
             scores=pred_boxes[:, 4],
             tags=pred_tags_name,
-            line_thick=1, line_color='white')
+            line_thick=3, line_color='green')
     name = args.img_path.split('/')[-1].split('.')[-2]
-    fpath = 'outputs/{}.png'.format(name)
+    fpath = '{}/{}.png'.format(args.output_folder, name)
     cv2.imwrite(fpath, image)
 
 def post_process(pred_boxes, config, scale):
@@ -103,15 +105,20 @@ def resize_img(image, short_size, max_size):
 def run_inference():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_dir', '-md', default=None, required=True, type=str)
-    parser.add_argument('--resume_weights', '-r', default=None, required=True, type=str)
-    parser.add_argument('--img_path', '-i', default=None, required=True, type=str)
+    parser.add_argument('--weights', '-w', default=None, required=True, type=str)
+    parser.add_argument('--img_folder', '-i', default=None, required=True, type=str)
+    parser.add_argument('--output_folder', '-o', default='output_folder', required=True, type=str)
     args = parser.parse_args()
     # import libs
     model_root_dir = os.path.join('../model/', args.model_dir)
     sys.path.insert(0, model_root_dir)
     from config import config
     from network import Network
-    inference(args, config, Network)
+
+    image_paths = list(Path(args.img_folder).glob("*"))
+    for img in tqdm(image_paths, desc='Visualizing predictions', total=len(image_paths)):
+        args.img_path = str(img)
+        inference(args, config, Network)
 
 if __name__ == '__main__':
     run_inference()
